@@ -1,0 +1,13 @@
+[package]
+name = "keyfn"
+version = "0.1.0"
+authors = ["einzigartigerName"]
+edition = "2018"
+
+[lib]
+name = "keyfn"
+path = "./src/lib.rs"
+
+[dependencies.x11]
+features = ["xlib"]
+version = "2.18.2"
