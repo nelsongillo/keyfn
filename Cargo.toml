@@ -1,6 +1,9 @@
 [package]
 name = "keyfn"
 version = "0.1.0"
+description = "call function on keypress/release"
+homepage = "https://github.com/einzigartigername/keyfn"
+repository = "https://github.com/einzigartigername/keyfn"
 authors = ["einzigartigerName"]
 edition = "2018"
 
