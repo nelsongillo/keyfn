@@ -5,6 +5,8 @@ description = "call function on keypress/release"
 homepage = "https://github.com/einzigartigername/keyfn"
 repository = "https://github.com/einzigartigername/keyfn"
 authors = ["einzigartigerName"]
+keywords = ["xlib", "keybinding"]
+license = "MIT"
 edition = "2018"
 
 [lib]
