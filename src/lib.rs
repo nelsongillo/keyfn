@@ -33,6 +33,12 @@ pub enum Trigger{
 }
 
 #[derive(Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+struct KeyBindMask{
+    keycode:    KeySym,
+    mod_mask:    c_uint,
+}
+
+#[derive(Debug)]
 pub struct KeyBind{
     pub keycode:    KeySym,
     pub mods:       Vec<Mod>, 
@@ -42,8 +48,8 @@ pub struct KeyBind{
 
 #[derive(Debug)]
 pub struct KeyStorage{
-    pressed:    HashMap<KeySym, KeyBind>,
-    released:   HashMap<KeySym, KeyBind>,
+    pressed:    HashMap<KeyBindMask, FunctionCall>,
+    released:   HashMap<KeyBindMask, FunctionCall>,
     display:    *mut Display,
     root:       Window,
 }
@@ -67,6 +73,18 @@ impl KeyBind{
             mods: mods,
             trigger: trigger,
             function: function,
+        }
+    }
+}
+
+impl KeyBindMask{
+    fn new(
+        keycode: KeySym,
+        mod_mask: c_uint,
+    ) -> Self{
+        KeyBindMask{
+            keycode: keycode,
+            mod_mask: mod_mask,
         }
     }
 }
@@ -95,9 +113,13 @@ impl KeyStorage{
         }
 
         if keybind.trigger == Trigger::Pressed {
-            self.pressed.insert(keybind.keycode, keybind);
+            for mask in create_bind_mask(&keybind){
+                self.pressed.insert(mask, keybind.function);
+            }
         }   else{
-            self.released.insert(keybind.keycode, keybind);
+            for mask in create_bind_mask(&keybind){
+                self.released.insert(mask, keybind.function);
+            }
         }
     }
 
@@ -105,21 +127,21 @@ impl KeyStorage{
         &mut self,
         event: &mut XEvent
     ){
-        let event_type = event.get_type();
-        let key = get_keysym_from_keycode(event.as_mut());
-    
-        if event_type == xlib::KeyPress {
+        let key = get_keysym_from_keycode(event.as_mut());    
+        let xkeyevent = unsafe { event.key };
+
+        if xkeyevent.type_ == xlib::KeyPress {
             
-            if let Some(binding) = self.pressed.get(&key){
-                let call = binding.function.to_owned();
+            if let Some(call) = self.pressed.get(&KeyBindMask::new(key, xkeyevent.state)){
+                let call = call.to_owned();
                 thread::spawn(move || {
                     call();
                 });
             }
-        } else if event_type == xlib::KeyRelease {
+        } else if xkeyevent.type_ == xlib::KeyRelease {
 
-            if let Some(binding) = self.released.get(&key){
-                let call = binding.function.to_owned();
+            if let Some(call) = self.released.get(&KeyBindMask::new(key, xkeyevent.state)){
+                let call = call.to_owned();
                 thread::spawn(move || {
                     call();
                 });
@@ -138,6 +160,9 @@ impl KeyStorage{
     }
 }
 
+/*
+*   Utility
+*/
 unsafe fn grab_key(
     display: *mut Display,
     root: Window,
@@ -145,7 +170,7 @@ unsafe fn grab_key(
 ){
     let keycode = xlib::XKeysymToKeycode(display, key.keycode) as c_int;
 
-    for mask in create_mod_mask(&mut key.mods.clone()) {
+    for mask in create_mod_mask(&key.mods) {
         xlib::XGrabKey(display,
                        keycode as c_int,
                        mask,
@@ -156,17 +181,13 @@ unsafe fn grab_key(
     }
 }
 
-
-/*
-*   Utility
-*/
-pub fn get_keysym_from_keycode(press: &mut xlib::XKeyEvent) -> xlib::KeySym {
+fn get_keysym_from_keycode(press: &mut xlib::XKeyEvent) -> xlib::KeySym {
     unsafe {
         xlib::XLookupKeysym(press as *mut _, 0) 
     }
 }
 
-fn create_mod_mask(mods: &mut Vec<Mod>) -> Vec<c_uint> {
+fn create_mod_mask(mods: &Vec<Mod>) -> Vec<c_uint> {
     let mut mod_mask;
 
     if mods.is_empty(){
@@ -195,6 +216,15 @@ fn create_mod_mask(mods: &mut Vec<Mod>) -> Vec<c_uint> {
     return out;
 }
 
+fn create_bind_mask(keybind: &KeyBind) -> Vec<KeyBindMask> {
+    let mut out = Vec::new();
+
+    for mask in create_mod_mask(&keybind.mods){
+        out.push(KeyBindMask::new(keybind.keycode, mask));
+    }
+
+    return out;
+}
 
 unsafe fn get_display() -> *mut xlib::Display {
     xlib::XOpenDisplay(ptr::null())
