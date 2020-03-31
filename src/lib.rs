@@ -1,4 +1,5 @@
 extern crate x11;
+extern crate fnv;
 
 use x11::xlib;
 use x11::xlib::{Display, Window, KeySym, XEvent};
@@ -6,13 +7,17 @@ use x11::xlib::{Display, Window, KeySym, XEvent};
 use std::ptr;
 use std::thread;
 use std::os::raw::{c_int, c_uint};
-use std::collections::HashMap;
 
+use fnv::FnvHashMap;
+
+/// X11 keysyms used as keycode for KeyBind
 pub use x11::keysym;
+/// Functoin to execute on KeyBind
 pub type FunctionCall = fn() -> ();
 
 const IGNORED_MOD_MASK: c_uint = xlib::LockMask | xlib::Mod2Mask | xlib::Mod3Mask;
 
+/// readable modifier values instead of X11 representation
 #[repr(u32)]
 #[derive(Debug, Hash, PartialOrd, Ord, PartialEq, Eq, Clone, Copy)]
 pub enum Mod{
@@ -26,6 +31,7 @@ pub enum Mod{
     CapsLock =      xlib::LockMask,
 }
 
+/// Enum for trigger event of function call
 #[derive(Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Trigger{
     Pressed,
@@ -38,6 +44,7 @@ struct KeyBindMask{
     mod_mask:    c_uint,
 }
 
+
 #[derive(Debug)]
 pub struct KeyBind{
     pub keycode:    KeySym,
@@ -48,8 +55,8 @@ pub struct KeyBind{
 
 #[derive(Debug)]
 pub struct KeyStorage{
-    pressed:    HashMap<KeyBindMask, FunctionCall>,
-    released:   HashMap<KeyBindMask, FunctionCall>,
+    pressed:    FnvHashMap<KeyBindMask, FunctionCall>,
+    released:   FnvHashMap<KeyBindMask, FunctionCall>,
     display:    *mut Display,
     root:       Window,
 }
@@ -90,20 +97,22 @@ impl KeyBindMask{
 }
 
 impl KeyStorage{
+    /// create empty KeyStorage
     pub fn new() -> Self{
         unsafe{
             let display = get_display();
             let root = get_root(display);
 
             KeyStorage{
-                pressed: HashMap::new(),
-                released: HashMap::new(),
+                pressed: FnvHashMap::default(),
+                released: FnvHashMap::default(),
                 display: display,
                 root: root,
             }
         }
     }
 
+    /// add new KeyBind to storage
     pub fn add(
         &mut self,
         keybind: KeyBind
@@ -123,7 +132,7 @@ impl KeyStorage{
         }
     }
 
-    pub fn action(
+    fn action(
         &mut self,
         event: &mut XEvent
     ){
@@ -149,6 +158,7 @@ impl KeyStorage{
         }
     }
 
+    /// start grabbing and executing functions in new thread
     pub fn start(&mut self) {
         let mut event = xlib::XEvent { pad: [0; 24] };
         loop {

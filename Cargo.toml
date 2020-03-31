@@ -1,7 +1,8 @@
 [package]
 name = "keyfn"
-version = "0.2.0"
+version = "0.2.1"
 description = "call function on keypress/release"
+readme = "./README.md"
 homepage = "https://github.com/einzigartigername/keyfn"
 repository = "https://github.com/einzigartigername/keyfn"
 authors = ["einzigartigerName"]
@@ -12,6 +13,9 @@ edition = "2018"
 [lib]
 name = "keyfn"
 path = "./src/lib.rs"
+
+[dependencies]
+fnv = "1.0.3"
 
 [dependencies.x11]
 features = ["xlib"]
